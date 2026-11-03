@@ -1,4 +1,4 @@
-# the yara sensor (name TBD)
+# hitomi
 
 A **listener-only YARA content scanner**, the sibling of [mimi](https://github.com/conor-sometimes/mimi):
 where mimi says *what a process did* over eBPF, this sensor says *what a file is* over YARA. It
@@ -10,42 +10,36 @@ acts, and never takes input from banken** -- the kernel is the only thing that d
 and response are banken's job; this sensor reports a signature on an inode with the pid that touched
 it, and stops.
 
-The working name is "the yara sensor" throughout; the real name is deferred.
+Named **hitomi** (Japanese for "pupil"): mimi hears over eBPF, hitomi sees over YARA. The repo dir
+and crate paths still read "yara sensor" / "yara-types" until the physical rename lands with the
+engine step.
 
 ## Kill chain
 
-Start to finish, a user downloads a malicious executable in the browser and runs it. The sensor only
-scans and reports; banken decides; enforcement is off by default and takes three opt-in gates to act.
+A user downloads a malicious executable and runs it. The sensor only scans and reports; banken
+decides; enforcement is off by default.
 
 ```mermaid
 flowchart TD
-    A["User downloads evil.bin in Chrome -> ~/Downloads/evil.bin"] --> B["Kernel fanotify: FAN_CLOSE_WRITE on the finished file"]
-    B --> C["yara sensor: open the inode read-only, scan the bytes with yara-x"]
-    C --> D{"YARA rule hit?"}
-    D -->|no| E["Silent. Benign file, nothing emitted (the common case)"]
-    D -->|yes| F["Emit one yara/1 event: path, pid, SHA256, namespace:name, score"]
-    F --> G["banken parser -> one normalized Event (Source=yara, Hashes=SHA256)"]
-    G --> H["Sigma, category antivirus -> yara_match fires (high)"]
-    G --> I["IOC engine: the SHA256 checked against threat feeds"]
-    H --> J["OCSF finding -> jsonl sink + journal + operator view  ::  DETECTION DONE"]
-    I --> J
-    J --> K{"enforcement armed AND source in enforceSources AND a policy rule matches?"}
-    K -->|"no (the default)"| L["Stop. Alert only. The file is left untouched."]
-    K -->|yes| M["Response executor"]
-    M --> N["Quarantine on the fd: neutralise, manifest-first, reversible"]
-    N --> O{"Was it also executed from a drop zone? (mimi / auditd correlate by hash + path)"}
-    O -->|yes| P["yara_match_exec_from_dropzone (critical) -> kill the process on exec"]
-    O -->|no| Q["File neutralised; it never ran"]
-    N --> R["respond thaw/restore: undo instantly if it was a false positive"]
-    MIMI["mimi: exec + syscalls"] --> G
-    AUD["auditd: execve"] --> G
+    A["malicious download"] -->|fanotify close-write| B["hitomi scans it"]
+    B --> C{"malware match?"}
+    C -->|no| D["ignored"]
+    C -->|yes| E["banken alerts"]
+    S["mimi / auditd"] -->|behaviour| E
+    E --> F{"enforcement on?"}
+    F -->|"no (default)"| G["alert only"]
+    F -->|yes| H["quarantine"]
+    H --> I{"already running?"}
+    I -->|yes| J["kill process"]
+    I -->|no| K["neutralised"]
 ```
 
-Two things the chart makes concrete. First, the sensor sits at the **front** of the chain (a peer of
-mimi, scanning at drop and exec time), not at the back as a thing banken calls to confirm. Second,
-the power is the **fusion**: eyes says what the bytes are, mimi/auditd say what the process did, the
-IOC engine says what the hash is known to be, and banken correlates all three into one verdict. On
-its own, each signal is ordinary; together they are the drop-zone-exec critical.
+Each hop in plain terms: the kernel tells hitomi a file just landed, hitomi scans the exact bytes
+and, only on a hit, emits a `yara/1` line carrying the path, pid and SHA256. banken turns that into an
+alert, fusing it with what mimi and auditd saw the process do. By default it stops there and leaves
+the file alone. With enforcement armed, banken quarantines the file (reversibly) and kills it if it
+is already running. The wire fields, the Sigma routing and the OCSF output live in the design doc;
+the chart is just the spine.
 
 **Design:** [`../banken/docs/design/yara-sensor.md`](../banken/docs/design/yara-sensor.md) is the
 authoritative spec (viability, the fanotify triggers, the engine decision, the Event mapping, the
