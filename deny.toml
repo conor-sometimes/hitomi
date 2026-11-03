@@ -5,6 +5,22 @@
 [advisories]
 version = 2
 yanked = "deny"
+# Reviewed, documented exceptions, never silent pulls. Both come from yara-x's pe/macho/dotnet
+# signature-parsing modules -- the modules that name trojaned binaries, which the sensor keeps on
+# purpose (design 8.1) -- so neither is removable without giving up detection. Re-reviewed on every
+# dependency bump; if a safe upgrade appears, the entry goes.
+ignore = [
+    # rsa Marvin timing side-channel. The advisory's own guidance: exploitable only where an
+    # attacker can observe RSA decryption timing over a network. The sensor performs no RSA
+    # private-key operations -- yara-x only inspects signatures embedded in the files it scans,
+    # which is local, offline byte-parsing with no network timing oracle. No safe upgrade is
+    # published (the latest rsa release is still affected).
+    "RUSTSEC-2023-0071",
+    # bincode is no longer maintained (the team declared 1.3.3/2.0.1 complete after a harassment
+    # incident): unmaintained, not vulnerable. It is a serde backend inside yara-x's compiled-rules
+    # serialisation, not a path attacker-controlled bytes reach; no migration exists upstream.
+    "RUSTSEC-2025-0141",
+]
 
 [licenses]
 version = 2

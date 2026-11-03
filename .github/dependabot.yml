@@ -7,6 +7,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+  # The fuzz crate is its own workspace with its own Cargo.lock; keep its pins current too.
+  - package-ecosystem: cargo
+    directory: "/fuzz"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
   # Keep the CI actions current (and it rewrites tags to pinned SHAs).
   - package-ecosystem: github-actions
     directory: "/"

@@ -10,9 +10,10 @@ permissions:
 # Actions are pinned to commit SHAs (a tag is mutable; a SHA is the artifact). Dependabot's
 # github-actions updater keeps them current, bumping the SHA and the trailing version comment.
 jobs:
-  # The wire-schema gate: fmt, clippy, unit tests, on stable (rust-toolchain.toml). The sensor is an
-  # ordinary stable crate, so unlike mimi there is no separate eBPF/flake build job -- a hermetic
-  # `nix build` is the belt-and-braces check below.
+  # The gate: fmt, clippy, unit tests across the workspace (the wire schema and the engine), on
+  # stable (rust-toolchain.toml). The sensor is an ordinary stable crate, so unlike mimi the engine
+  # is linted and tested here rather than behind a flake-only job; the hermetic `nix build` below
+  # is the belt-and-braces check.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -22,11 +23,11 @@ jobs:
       - name: fmt
         run: cargo fmt --check
       - name: clippy
-        run: cargo clippy -p yara-types --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: test
-        run: cargo test -p yara-types
+        run: cargo test --workspace
 
-  # The crate builds and tests hermetically through the flake (fenix stable + crane).
+  # The wire-types crate builds and tests hermetically through the flake (fenix stable + crane).
   build:
     runs-on: ubuntu-latest
     steps:
@@ -38,9 +39,13 @@ jobs:
       - name: build the wire-types crate
         run: nix build .#yara-types
 
-  # Supply chain: advisories, licenses, sources (deny.toml).
+  # Supply chain: advisories, licenses, sources (deny.toml), for the main tree and the fuzz crate
+  # (its own workspace -- the instrumented build is under the same gate).
   deny:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        with:
+          manifest-path: fuzz/Cargo.toml

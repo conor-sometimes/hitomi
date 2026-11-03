@@ -44,6 +44,17 @@
             "clippy"
           ];
 
+          # The same stable toolchain plus the musl target's std, combined into one sysroot, so
+          # `cargo build --target x86_64-unknown-linux-musl` can produce the fully-static binary
+          # that ships to non-NixOS distros as copy-and-run (design 8.1). yara-x + wasmtime (pulley,
+          # pure-Rust interpreter) are ordinary Rust, so the musl target needs no extra C toolchain:
+          # Rust links a self-contained musl. This is a separate shell, not the default, so the gate
+          # stays a plain host build.
+          muslToolchain = fenix.packages.${system}.combine [
+            toolchain
+            fenix.packages.${system}.targets."x86_64-unknown-linux-musl".stable.rust-std
+          ];
+
           craneLib = (crane.mkLib pkgs).overrideToolchain (_: toolchain);
 
           # The wire-types crate, built and unit-tested hermetically. The only step-1 artifact.
@@ -57,7 +68,7 @@
           };
         in
         {
-          inherit pkgs toolchain yaraTypesPackage;
+          inherit pkgs toolchain muslToolchain yaraTypesPackage;
         };
     in
     {
@@ -79,7 +90,23 @@
         in
         {
           default = s.pkgs.mkShell {
-            packages = [ s.toolchain ];
+            # The toolchain plus the gate's tools, so `nix develop -c just` runs the whole gate
+            # (fmt-check, clippy, test, deny). cargo-fuzz is deliberately not here: the fuzz
+            # campaign needs a nightly rustc (sanitizer + coverage instrumentation), so it runs in
+            # its own nightly shell, not this stable one (see the justfile `fuzz` recipe).
+            packages = [
+              s.toolchain
+              s.pkgs.just
+              s.pkgs.cargo-deny
+            ];
+          };
+
+          # The fully-static musl build shell: `nix develop .#musl -c cargo build --release
+          # --target x86_64-unknown-linux-musl -p hitomi` produces the copy-and-run binary for any
+          # Linux distro (design 8.1). No musl C toolchain is needed -- the tree is pure Rust and
+          # Rust links a self-contained musl.
+          musl = s.pkgs.mkShell {
+            packages = [ s.muslToolchain ];
           };
         }
       );

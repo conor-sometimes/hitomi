@@ -1,0 +1,34 @@
+[package]
+name = "hitomi"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The yara sensor's engine and on-demand scanner: compile a directory of YARA rules with yara-x (Pulley, no JIT) and emit a yara/1 event per match."
+# A binary, never a crates.io library: the path dep on yara-types is correct precisely because this
+# is not published (crates.io forbids path deps, so cargo-deny only tolerates them when publish=false).
+publish = false
+
+# A library (the engine) plus the binary (the CLI). The daemon joins the binary in a later step
+# (design section 12 step 4); keeping the engine in the library makes it unit-testable and shared
+# between the CLI, the daemon and the fuzz target without a second copy.
+[lib]
+name = "hitomi"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hitomi"
+path = "src/main.rs"
+
+[dependencies]
+# The shared wire schema (render/parse of the yara/1 line), the only cross-repo contract.
+yara-types = { path = "../yara-types" }
+# The engine. `pulley` routes rule evaluation through the wasmtime interpreter, so no writable-
+# then-executable page is ever mapped and the sensor runs under MemoryDenyWriteExecute=yes
+# (design section 2.2, proven on hokkaido). `magic-module` is never enabled.
+yara-x = { workspace = true }
+# SHA-256 of the scanned bytes. Already in yara-x's tree through its hash-module, so it adds no new
+# audit surface (design section 8.1).
+sha2 = { workspace = true }
+# Error context on the load/scan path; the one error crate, as mimi uses it.
+anyhow = { workspace = true }

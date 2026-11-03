@@ -1,0 +1,1 @@
+{"schema":"yara/99","kind":"match","time":"2026-01-01T00:00:00.000Z","trigger":"scan","file":{"path":"/x","size":1,"hashes":[{"algorithm":"SHA-256","value":"00"}]},"process":{"pid":0},"rule":{"name":"r","namespace":"default","tags":[],"patterns":[]},"engine":"yara-x 1.22.1","ruleset":"sha256:00","truncated":false}

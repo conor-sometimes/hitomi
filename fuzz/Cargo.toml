@@ -1,0 +1,42 @@
+[package]
+name = "hitomi-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "MIT"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+# Exact-pinned like the rest of the tree, and Cargo.lock is committed, so the one place that builds
+# with instrumentation is under the same supply-chain gate (`just deny` checks this manifest too).
+libfuzzer-sys = "=0.4.13"
+hitomi = { path = "../hitomi" }
+yara-types = { path = "../yara-types" }
+
+# Its own workspace: cargo-fuzz builds with special flags, kept out of the main tree.
+[workspace]
+
+[profile.release]
+debug = 1
+
+# fuzz_scan: the untrusted-input surface. Compile a fixed rule set ONCE (lazily, reused across
+# runs), then scan arbitrary fuzzer bytes. The scanner must never panic on any file content; a
+# yara-x scan error is a value the engine returns, not a crash (design section 2.2's never-die bar).
+[[bin]]
+name = "fuzz_scan"
+path = "fuzz_targets/fuzz_scan.rs"
+test = false
+doc = false
+bench = false
+
+# fuzz_parse: feed arbitrary bytes to the wire parser. Never panic; a line that parses must
+# round-trip (parse -> render -> parse is stable), so a hostile line degrades a detection, never
+# crashes banken's reader.
+[[bin]]
+name = "fuzz_parse"
+path = "fuzz_targets/fuzz_parse.rs"
+test = false
+doc = false
+bench = false

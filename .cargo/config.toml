@@ -1,0 +1,13 @@
+# Build targets for the sensor. The default host build (x86_64/aarch64-linux-gnu) needs nothing
+# here. The musl entry is the ship target (design 8.1): a fully-static, copy-and-run binary for any
+# Linux distro, not just NixOS. crt-static is already the default for musl targets; it is stated
+# explicitly so the intent is visible and cannot be flipped off by a stray profile. yara-x and its
+# wasmtime runtime (pulley, the pure-Rust interpreter) are ordinary Rust, so no musl C toolchain or
+# linker override is needed -- Rust links a self-contained musl.
+#
+# Build it with: nix develop .#musl -c cargo build --release --target x86_64-unknown-linux-musl -p hitomi
+[target.x86_64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=+crt-static"]
