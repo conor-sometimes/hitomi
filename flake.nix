@@ -58,10 +58,21 @@
           craneLib = (crane.mkLib pkgs).overrideToolchain (_: toolchain);
 
           # The wire-types crate, built and unit-tested hermetically. The only step-1 artifact.
+          # Its test asserts against the shared golden via `include_str!("../../testdata/...")`, so
+          # the golden compiles into the test binary: the sandboxed source must keep testdata/
+          # alongside the Cargo sources cleanCargoSource would keep. A plain cleanCargoSource drops
+          # testdata/ and the hermetic checkPhase then fails to read the golden (CI, not the local
+          # `nix develop` gate where the whole tree is present).
+          yaraTypesSrc = pkgs.lib.cleanSourceWith {
+            name = "source";
+            src = ./.;
+            filter = path: type:
+              (pkgs.lib.hasInfix "/testdata/" path) || (craneLib.filterCargoSources path type);
+          };
           yaraTypesPackage = craneLib.buildPackage {
             pname = "yara-types";
             version = "0.1.0";
-            src = craneLib.cleanCargoSource ./.;
+            src = yaraTypesSrc;
             strictDeps = true;
             cargoExtraArgs = "--package yara-types";
             doCheck = true;
