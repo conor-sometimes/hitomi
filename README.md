@@ -12,6 +12,41 @@ it, and stops.
 
 The working name is "the yara sensor" throughout; the real name is deferred.
 
+## Kill chain
+
+Start to finish, a user downloads a malicious executable in the browser and runs it. The sensor only
+scans and reports; banken decides; enforcement is off by default and takes three opt-in gates to act.
+
+```mermaid
+flowchart TD
+    A["User downloads evil.bin in Chrome -> ~/Downloads/evil.bin"] --> B["Kernel fanotify: FAN_CLOSE_WRITE on the finished file"]
+    B --> C["yara sensor: open the inode read-only, scan the bytes with yara-x"]
+    C --> D{"YARA rule hit?"}
+    D -->|no| E["Silent. Benign file, nothing emitted (the common case)"]
+    D -->|yes| F["Emit one yara/1 event: path, pid, SHA256, namespace:name, score"]
+    F --> G["banken parser -> one normalized Event (Source=yara, Hashes=SHA256)"]
+    G --> H["Sigma, category antivirus -> yara_match fires (high)"]
+    G --> I["IOC engine: the SHA256 checked against threat feeds"]
+    H --> J["OCSF finding -> jsonl sink + journal + operator view  ::  DETECTION DONE"]
+    I --> J
+    J --> K{"enforcement armed AND source in enforceSources AND a policy rule matches?"}
+    K -->|"no (the default)"| L["Stop. Alert only. The file is left untouched."]
+    K -->|yes| M["Response executor"]
+    M --> N["Quarantine on the fd: neutralise, manifest-first, reversible"]
+    N --> O{"Was it also executed from a drop zone? (mimi / auditd correlate by hash + path)"}
+    O -->|yes| P["yara_match_exec_from_dropzone (critical) -> kill the process on exec"]
+    O -->|no| Q["File neutralised; it never ran"]
+    N --> R["respond thaw/restore: undo instantly if it was a false positive"]
+    MIMI["mimi: exec + syscalls"] --> G
+    AUD["auditd: execve"] --> G
+```
+
+Two things the chart makes concrete. First, the sensor sits at the **front** of the chain (a peer of
+mimi, scanning at drop and exec time), not at the back as a thing banken calls to confirm. Second,
+the power is the **fusion**: eyes says what the bytes are, mimi/auditd say what the process did, the
+IOC engine says what the hash is known to be, and banken correlates all three into one verdict. On
+its own, each signal is ordinary; together they are the drop-zone-exec critical.
+
 **Design:** [`../banken/docs/design/yara-sensor.md`](../banken/docs/design/yara-sensor.md) is the
 authoritative spec (viability, the fanotify triggers, the engine decision, the Event mapping, the
 unit, the matrix). Read it first.
