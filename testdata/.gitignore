@@ -1,0 +1,5 @@
+# Generated test corpora - NEVER commit. They contain the EICAR string, which
+# trips antivirus on the committer's machine, in CI, and on the git host.
+# Regenerate with corpus/mkcorpus.sh and suite/mksuite.sh.
+corpus/out/
+suite/out/
