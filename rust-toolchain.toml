@@ -1,0 +1,7 @@
+# Stable Rust: the sensor is an ordinary crate (no eBPF, no build-std, no bpf-linker, no LLVM
+# coherence to pin -- the opposite of mimi's nightly). The engine step adds yara-x, which also
+# builds on stable. The flake pins the exact toolchain reproducibly; this file is what a bare
+# `cargo`/`rustup` on a dev box uses.
+[toolchain]
+channel = "stable"
+components = ["rust-src", "rustfmt", "clippy"]

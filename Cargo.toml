@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["yara-types"]
+
+[workspace.package]
+license = "MIT"
+edition = "2021"
+repository = "https://github.com/conor-sometimes/yara-sensor"
+
+# Dependency policy (README "Dependencies"), the mimi policy verbatim: every dep is audit surface,
+# justified against the cost of auditing its whole tree. The step-1 wire-types crate needs only
+# serde + serde_json to render and parse the `yara/1` line. The engine crate (yara-x, sha2, libc,
+# anyhow) lands in a later step. Exact pins (`=x.y.z`), Cargo.lock committed, so the whole tree is
+# deterministic; cargo-deny gates it and Dependabot proposes bumps as PRs.
+[workspace.dependencies]
+serde = { version = "=1.0.228", default-features = false, features = ["std", "derive"] }
+serde_json = { version = "=1.0.145", default-features = false, features = ["std"] }

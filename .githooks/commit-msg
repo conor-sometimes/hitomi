@@ -1,0 +1,36 @@
+#!/bin/sh
+# Refuse commit messages that credit an AI tool.
+#
+# Tracked in the repo (not .git/hooks) so a fresh clone enforces it without
+# depending on anyone's global git config -- run `just install-hooks` once to
+# point core.hooksPath here. Bypass a single commit with `git commit --no-verify`.
+
+msg=$1
+# The message only: stop at the scissors line (commit.verbose appends the diff
+# below it) and skip comment lines.
+body=$(sed -n '/^# -\{24\} >8 -\{24\}$/q; /^#/d; p' "$msg")
+
+bad=$(printf '%s\n' "$body" | grep -inE \
+    -e '^co-authored-by:.*(claude|anthropic|openai|chatgpt|codex|copilot|gemini|cursor)' \
+    -e 'generated (with|by) .*(claude|chatgpt|copilot|gemini|cursor|codex)' \
+    -e '🤖')
+if [ -n "$bad" ]; then
+    echo "commit-msg: no AI attribution in commit messages. Remove:" >&2
+    printf '%s\n' "$bad" | sed 's/^/  line /' >&2
+    exit 1
+fi
+
+# No em/en dashes in the message (an AI-writing tell; use a plain ASCII hyphen).
+dash=$(printf '%s\n' "$body" | perl -CSD -ne 'print "$.: $_" if /[\x{2012}-\x{2015}\x{2212}]/')
+if [ -n "$dash" ]; then
+    echo "commit-msg: no em/en dashes in commit messages (use '-'). Remove:" >&2
+    printf '%s\n' "$dash" | sed 's/^/  line /' >&2
+    exit 1
+fi
+
+# Chain to a repo-local .git/hooks/commit-msg if one exists, so this never
+# silently disables another local hook.
+own="$(git rev-parse --git-common-dir)/hooks/commit-msg"
+if [ -x "$own" ]; then
+    exec "$own" "$@"
+fi

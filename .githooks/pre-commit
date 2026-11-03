@@ -1,0 +1,22 @@
+#!/bin/sh
+# Refuse to stage AI-tell typography: em/en dashes and friends (use a plain ASCII hyphen '-').
+#
+# Tracked in the repo (not .git/hooks) so a fresh clone enforces it without depending on anyone's
+# global git config -- run `just install-hooks` once to point core.hooksPath here. Checks only the
+# lines you are ADDING, so pre-existing text never blocks an unrelated change. Bypass a single
+# commit with `git commit --no-verify`. perl (not grep -P) so it runs on BSD/macOS too.
+
+bad=$(git diff --cached --no-color -U0 --diff-filter=ACM \
+    | perl -CSD -ne 'next if /^\+\+\+/; print if /^\+/ && /[\x{2012}-\x{2015}\x{2212}]/')
+if [ -n "$bad" ]; then
+    echo "pre-commit: no em/en dashes in staged content (use a plain hyphen '-'). Offending additions:" >&2
+    printf '%s\n' "$bad" | sed 's/^/  /' >&2
+    exit 1
+fi
+
+# Chain to a repo-local .git/hooks/pre-commit if one exists, so this never silently disables
+# another local hook.
+own="$(git rev-parse --git-common-dir)/hooks/pre-commit"
+if [ -x "$own" ]; then
+    exec "$own" "$@"
+fi

@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Cargo deps are exact-pinned in Cargo.toml; Dependabot proposes bumps as PRs, gated by CI +
+  # cargo-deny + review.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+  # Keep the CI actions current (and it rewrites tags to pinned SHAs).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
