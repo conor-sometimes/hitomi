@@ -11,9 +11,10 @@
 //! 2.2). A crafted file that trips a parser bug surfaces as a caught error from [`Engine::scan`],
 //! never a crash of the process (design section 2.2's never-die argument); `fuzz/` proves it.
 //!
-//! This crate is the engine and the on-demand `scan` path only. The fanotify daemon, its cache,
-//! queue and the kernel-facing `unsafe` land in a later step (design section 12 step 4); nothing
-//! here is `unsafe`.
+//! This crate is the engine (this file, no `unsafe`), the on-demand `scan` path, and -- on Linux --
+//! the fanotify daemon. All of the kernel-facing `unsafe` lives in the [`fanotify`] module and is
+//! driven by the [`daemon`] reader/scanner loop; both are Linux-only (fanotify is a Linux uapi), so
+//! the engine and the `scan` CLI still compile and test on a non-Linux dev box.
 
 use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
@@ -22,13 +23,30 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use yara_x::MetaValue;
 
+// The fanotify daemon and its kernel-facing unsafe are Linux-only (fanotify is a Linux uapi). The
+// engine above and the `scan` CLI are portable; gating these two keeps a non-Linux `cargo check`
+// of the engine green while the daemon is built and proven on Linux (hokkaido, CI).
+#[cfg(target_os = "linux")]
+pub mod daemon;
+#[cfg(target_os = "linux")]
+pub mod fanotify;
+
 /// The engine identity stamped on every event's `engine` field. Kept in step with the `yara-x` pin
 /// in `Cargo.toml`; a bump moves both.
 pub const ENGINE: &str = "yara-x 1.22.1";
 
 /// The trigger string the on-demand CLI stamps (design section 3.3: `sensor scan` is the
-/// on-demand trigger). The daemon's fanotify triggers (`exec`, `close-write`) land in a later step.
+/// on-demand trigger).
 pub const TRIGGER_SCAN: &str = "scan";
+
+/// The trigger string for an `FAN_OPEN_EXEC` event: the file that was executed, scanned as the
+/// bytes that ran (design section 3.3). Stamped by the daemon.
+pub const TRIGGER_EXEC: &str = "exec";
+
+/// The trigger string for an `FAN_CLOSE_WRITE` event under a drop zone: a file that was written and
+/// closed (a dropper, a staged payload), scanned before it runs (design section 3.3). Stamped by
+/// the daemon.
+pub const TRIGGER_CLOSE_WRITE: &str = "close-write";
 
 /// File extensions treated as YARA rule sources when loading a directory. A rule set is a
 /// directory of files, never a file that reads other files: `include` is not used (design 2.3).
@@ -146,11 +164,34 @@ impl Engine {
         self.scan_bytes(&data)
     }
 
-    /// Scan an in-memory buffer. The byte-slice entry point the daemon (an fd read) and the fuzzer
-    /// share; [`Engine::scan`] is this plus a file read.
+    /// Scan an in-memory buffer. The byte-slice entry point the fuzzer and [`Engine::scan`] (which
+    /// is this plus a file read) share, with no scan bounds -- the on-demand CLI path, where the
+    /// operator waits for a verdict on a file they named. The daemon uses [`Engine::scan_bytes_bounded`]
+    /// instead, which caps the per-scan time and matches so one pathological file cannot stall the
+    /// single scanner thread (design 7.3).
     pub fn scan_bytes(&self, data: &[u8]) -> Result<ScanOutcome> {
+        self.scan_bytes_bounded(data, None, None)
+    }
+
+    /// Scan an in-memory buffer under optional bounds: `timeout` caps the wall-clock a single scan
+    /// may take (a timed-out scan is an `Err`, which the daemon caches as `failed: timeout` so the
+    /// one file is paid for once), and `max_matches_per_pattern` stops a pattern that matches a
+    /// million times (design 7.3). `None` for either leaves yara-x's own default (no timeout; its
+    /// built-in per-pattern cap). The hash is over the exact bytes scanned, as in [`Engine::scan`].
+    pub fn scan_bytes_bounded(
+        &self,
+        data: &[u8],
+        timeout: Option<Duration>,
+        max_matches_per_pattern: Option<usize>,
+    ) -> Result<ScanOutcome> {
         let sha256 = hex(&Sha256::digest(data));
         let mut scanner = yara_x::Scanner::new(&self.rules);
+        if let Some(t) = timeout {
+            scanner.set_timeout(t);
+        }
+        if let Some(m) = max_matches_per_pattern {
+            scanner.max_matches_per_pattern(m);
+        }
         let results = scanner
             .scan(data)
             .map_err(|e| anyhow::anyhow!("yara-x scan failed: {e}"))?;

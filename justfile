@@ -2,7 +2,7 @@
 # the whole thing. Runs on the stable toolchain (rust-toolchain.toml); in the lane this is run
 # inside `nix develop` on hokkaido (there is no nix on the Mac).
 
-default: fmt-check clippy test deny
+default: fmt-check clippy charter test deny
 
 # Format (write locally; check in CI).
 fmt:
@@ -20,6 +20,13 @@ clippy:
 # load/scan/event path (no kernel, no fanotify).
 test:
     cargo test --workspace
+
+# The listener charter, mechanically enforced (design 3.2): fail the build if a permission class or
+# an `_PERM` mask appears in code (outside the comments that explain the ban). hitomi is a listener,
+# never an enforcer -- a dead sensor must never delay an exec. This is the counterpart of mimi's
+# `bpf_send_signal` ban.
+charter:
+    bash ci/listener-charter-gate.sh
 
 # Supply-chain gate: advisories, licenses, sources (deny.toml). The fuzz crate is its own workspace
 # (cargo-fuzz builds it with special flags), so gate it explicitly too -- the instrumented build
