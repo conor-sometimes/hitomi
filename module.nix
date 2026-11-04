@@ -131,7 +131,7 @@ in
   config = lib.mkIf cfg.enable {
     systemd.services.hitomi = {
       description = "hitomi: YARA content-scanner sensor for banken (listener-only)";
-      documentation = [ "https://github.com/conor-sometimes/yara-sensor" ];
+      documentation = [ "https://github.com/conor-sometimes/hitomi" ];
       wantedBy = [ "multi-user.target" ];
       # Start after local filesystems are mounted so the mark list at start covers them (a filesystem
       # mounted later is picked up on a SIGHUP / restart, design 3.4).

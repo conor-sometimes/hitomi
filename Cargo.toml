@@ -5,7 +5,7 @@ members = ["yara-types", "hitomi"]
 [workspace.package]
 license = "MIT"
 edition = "2021"
-repository = "https://github.com/conor-sometimes/yara-sensor"
+repository = "https://github.com/conor-sometimes/hitomi"
 
 # Dependency policy (README "Dependencies"), the mimi policy verbatim: every dep is audit surface,
 # justified against the cost of auditing its whole tree. The wire-types crate needs only serde +
