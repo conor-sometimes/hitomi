@@ -56,6 +56,48 @@
           ];
 
           craneLib = (crane.mkLib pkgs).overrideToolchain (_: toolchain);
+          # The same crane with the musl sysroot, for the fully-static ship binary below.
+          craneLibMusl = (crane.mkLib pkgs).overrideToolchain (_: muslToolchain);
+
+          # The whole workspace's cargo source (both crates). doCheck is off for the binary builds
+          # (the gate's `cargo test` and the hermetic yara-types check cover tests); yara-x's
+          # include_str of testdata is #[cfg(test)]-only, so a non-test build needs no testdata/.
+          workspaceSrc = craneLib.cleanCargoSource ./.;
+
+          # The hitomi daemon+CLI binary. yara-x (Pulley) + wasmtime are ordinary Rust, so this is a
+          # plain crane build -- no bpf-linker, no build-std, none of mimi's toolchain machinery.
+          # Dependencies are compiled once and reused between the gnu and musl builds.
+          hitomiArgs = {
+            pname = "hitomi";
+            version = "0.1.0";
+            src = workspaceSrc;
+            strictDeps = true;
+            cargoExtraArgs = "--package hitomi";
+            doCheck = false;
+            meta.mainProgram = "hitomi";
+            # yara-x's build.rs regenerates its protobuf module code and, when it does, copies the
+            # result INTO its own source tree (src/modules/protos/generated). In a Nix sandbox the
+            # vendored crate source is read-only, so that copy panics with EACCES. yara-x ships the
+            # generated files and provides exactly one escape hatch for a read-only source tree --
+            # the DOCS_RS env var (named for docs.rs, whose FS is also read-only): with it set,
+            # build.rs skips regeneration and uses the committed generated code, which is correct for
+            # a pinned version. This is the single reason it is set.
+            DOCS_RS = "1";
+          };
+          hitomiDeps = craneLib.buildDepsOnly hitomiArgs;
+          hitomiPackage = craneLib.buildPackage (hitomiArgs // { cargoArtifacts = hitomiDeps; });
+
+          # The fully-static musl ship binary (design 8.1): the sensor's own code has no
+          # proc-macro-forces-dynamic problem, and yara-x + wasmtime's Pulley interpreter are pure
+          # Rust, so Rust links a self-contained musl -- no musl C toolchain. A VM check boots this
+          # STATIC binary to prove it marks + scans just like the gnu one.
+          hitomiMuslArgs = hitomiArgs // {
+            pname = "hitomi-musl";
+            CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
+          };
+          hitomiMuslDeps = craneLibMusl.buildDepsOnly hitomiMuslArgs;
+          hitomiMuslPackage =
+            craneLibMusl.buildPackage (hitomiMuslArgs // { cargoArtifacts = hitomiMuslDeps; });
 
           # The wire-types crate, built and unit-tested hermetically. The only step-1 artifact.
           # Its test asserts against the shared golden via `include_str!("../../testdata/...")`, so
@@ -79,10 +121,23 @@
           };
         in
         {
-          inherit pkgs toolchain muslToolchain yaraTypesPackage;
+          inherit pkgs toolchain muslToolchain yaraTypesPackage hitomiPackage hitomiMuslPackage;
         };
     in
     {
+      # services.hitomi: the sensor as a hardened systemd service (module.nix). Usually turned on via
+      # banken's one switch (a later step); import this alongside banken's module. The nixosModule
+      # defaults services.hitomi.package to this flake's own hitomi build, so the switch deploys
+      # turnkey (overridable with a plain mkForce/assignment).
+      nixosModules.default =
+        { pkgs, lib, ... }:
+        {
+          imports = [ ./module.nix ];
+          config.services.hitomi.package =
+            lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.hitomi;
+        };
+      nixosModules.hitomi = self.nixosModules.default;
+
       packages = forAllSystems (
         system:
         let
@@ -90,7 +145,36 @@
         in
         {
           yara-types = s.yaraTypesPackage;
-          default = s.yaraTypesPackage;
+          hitomi = s.hitomiPackage;
+          hitomi-musl = s.hitomiMuslPackage;
+          default = s.hitomiPackage;
+        }
+      );
+
+      # Runtime VM tests (x86_64-linux only: runNixOSTest needs a KVM builder of the test's system).
+      #   vm-hitomi      -- the hardened unit starts and stays up under MemoryDenyWriteExecute, an
+      #                     exec of an EICAR canary and a drop-zone write each produce a yara/1 line,
+      #                     a clean exec produces nothing, and the canary is never blocked (design
+      #                     8.4 Y3-Y5). The listener proof under the real unit.
+      #   vm-hitomi-musl -- the same, forcing the fully-static musl binary as the package.
+      checks = nixpkgs.lib.genAttrs [ "x86_64-linux" ] (
+        system:
+        let
+          s = perSystem system;
+          args = {
+            pkgs = s.pkgs;
+            hitomiModule = self.nixosModules.default;
+          };
+        in
+        {
+          vm-hitomi = import ./tests/yara-switch.nix args;
+          vm-hitomi-musl = import ./tests/yara-switch.nix (
+            args
+            // {
+              name = "hitomi-unit-musl";
+              hitomiPackage = s.hitomiMuslPackage;
+            }
+          );
         }
       );
 
