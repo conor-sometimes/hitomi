@@ -22,6 +22,13 @@
 
 use serde::{Deserialize, Serialize};
 
+// The daemon's kernel-free logic, kept here (design 8.1) so it is unit-tested on the Mac with no
+// syscalls: the verdict cache key and its bounded LRU, mountinfo parsing + filesystem
+// classification, and path-prefix matching for the drop-zone and exclude filters.
+pub mod cache;
+pub mod mount;
+pub mod prefix;
+
 /// The wire schema version, emitted in every line. banken checks it and skips a line whose version
 /// it does not know rather than misreading newer bytes, so the sensor and the brain can evolve
 /// without silent drift (the same contract mimi's `SCHEMA` carries).
