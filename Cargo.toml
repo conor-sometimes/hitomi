@@ -23,3 +23,7 @@ serde_json = { version = "=1.0.154", default-features = false, features = ["std"
 yara-x = { version = "=1.22.1", features = ["pulley"] }
 sha2 = "=0.11.1"
 anyhow = "=1.0.104"
+# The fanotify daemon's only new dependency: three syscalls and a struct of Linux uapi (design 8.1).
+# Already in yara-x's tree, so it adds no new audit surface. Used on Linux targets only (the daemon
+# is cfg(target_os = "linux")).
+libc = "=0.2.191"

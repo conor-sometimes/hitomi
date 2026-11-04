@@ -32,3 +32,9 @@ yara-x = { workspace = true }
 sha2 = { workspace = true }
 # Error context on the load/scan path; the one error crate, as mimi uses it.
 anyhow = { workspace = true }
+
+# The fanotify daemon is Linux-only (fanotify is a Linux uapi), so libc -- the raw syscall surface
+# for fanotify_init/fanotify_mark/read/fstat/readlink/poll/sigaction -- is a Linux-target dependency
+# only. On any other target the daemon module is cfg'd out and this is not pulled in.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }

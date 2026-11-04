@@ -24,6 +24,10 @@ jobs:
         run: cargo fmt --check
       - name: clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: listener-charter gate
+        # hitomi is listener-only: fail if a permission class or _PERM mask appears in code (design
+        # 3.2). The written counterpart of mimi's bpf_send_signal ban.
+        run: bash ci/listener-charter-gate.sh
       - name: test
         run: cargo test --workspace
 
