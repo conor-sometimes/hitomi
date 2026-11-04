@@ -28,9 +28,7 @@ pub fn is_under(path: &str, prefix: &str) -> bool {
     }
     // path must start with "prefix/" so the next char after the prefix is a separator -- this is
     // what rejects /tmpfoo for prefix /tmp.
-    path.len() > prefix.len()
-        && path.as_bytes()[prefix.len()] == b'/'
-        && path.starts_with(prefix)
+    path.len() > prefix.len() && path.as_bytes()[prefix.len()] == b'/' && path.starts_with(prefix)
 }
 
 /// True when `path` is under any of `prefixes`. Used for both the drop-zone test (report a
@@ -42,8 +40,7 @@ pub fn is_under_any(path: &str, prefixes: &[String]) -> bool {
 /// The default drop-zone prefixes a `FAN_CLOSE_WRITE` must be under to be reported. Mirrors the
 /// quarantine `allowPaths` list in the design (3.3) so a dropper caught here is in a place the
 /// responder is allowed to quarantine from.
-pub const DEFAULT_DROP_ZONES: &[&str] =
-    &["/tmp", "/var/tmp", "/dev/shm", "/home", "/root", "/opt"];
+pub const DEFAULT_DROP_ZONES: &[&str] = &["/tmp", "/var/tmp", "/dev/shm", "/home", "/root", "/opt"];
 
 /// The default exclude prefixes dropped before any scan. `/proc /sys /dev` are pseudo; the sensor's
 /// own sink and banken's state/alert/audit paths are excluded so the sensor never reports its own

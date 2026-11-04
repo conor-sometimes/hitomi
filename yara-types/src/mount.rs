@@ -21,24 +21,48 @@ pub const LOCAL_FSTYPES: &[&str] = &[
 /// Pseudo filesystems: kernel-synthetic, nothing on disk to scan. Never marked. Listed so an
 /// expected pseudo type is classified, not reported as unknown.
 pub const PSEUDO_FSTYPES: &[&str] = &[
-    "proc", "sysfs", "cgroup", "cgroup2", "devtmpfs", "devpts", "mqueue", "hugetlbfs", "bpf",
-    "tracefs", "debugfs", "securityfs", "pstore", "configfs", "fusectl", "binfmt_misc",
-    "autofs", "rpc_pipefs", "efivarfs", "selinuxfs",
+    "proc",
+    "sysfs",
+    "cgroup",
+    "cgroup2",
+    "devtmpfs",
+    "devpts",
+    "mqueue",
+    "hugetlbfs",
+    "bpf",
+    "tracefs",
+    "debugfs",
+    "securityfs",
+    "pstore",
+    "configfs",
+    "fusectl",
+    "binfmt_misc",
+    "autofs",
+    "rpc_pipefs",
+    "efivarfs",
+    "selinuxfs",
 ];
 
 /// Network filesystems: a scan read is a network round trip and a hung server would hang the
 /// scanner thread, so these are never marked (design 3.4). `fuse.*` is matched by prefix in
 /// [`is_network_fstype`], not listed here.
 pub const NETWORK_FSTYPES: &[&str] = &[
-    "nfs", "nfs4", "cifs", "smb3", "9p", "ceph", "glusterfs", "afs", "ncpfs", "fuseblk",
+    "nfs",
+    "nfs4",
+    "cifs",
+    "smb3",
+    "9p",
+    "ceph",
+    "glusterfs",
+    "afs",
+    "ncpfs",
+    "fuseblk",
 ];
 
 /// True for a network filesystem type, including any `fuse.*` backend (sshfs, s3fs, a userspace
 /// driver whose latency and failure modes the scanner must not inherit).
 pub fn is_network_fstype(fstype: &str) -> bool {
-    fstype == "fuse"
-        || fstype.starts_with("fuse.")
-        || NETWORK_FSTYPES.contains(&fstype)
+    fstype == "fuse" || fstype.starts_with("fuse.") || NETWORK_FSTYPES.contains(&fstype)
 }
 
 /// True for a local, on-disk filesystem the sensor marks. A network type is never local even if it
