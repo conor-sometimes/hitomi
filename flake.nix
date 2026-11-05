@@ -20,10 +20,15 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     crane.url = "github:ipetkov/crane";
+
+    # mayfly: the cross-distro test harness, consumed for the distro accuracy
+    # matrix (tests/distros/matrix.nix). Its nixpkgs follows ours.
+    mayfly.url = "github:conor-sometimes/mayfly";
+    mayfly.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
-    { self, nixpkgs, fenix, crane }:
+    { self, nixpkgs, fenix, crane, mayfly }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
@@ -177,6 +182,16 @@
           );
         }
       );
+
+      # Cross-distro accuracy matrix (tests/distros/matrix.nix): the shipped musl
+      # binary's EICAR suite on each real vendor distro, via mayfly. x86_64-linux
+      # only (needs a KVM host). `nix run .#matrix`, or `.#distro-ubuntu-2404`
+      # for one.
+      apps.x86_64-linux = (import ./tests/distros/matrix.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        lib = nixpkgs.lib;
+        inherit mayfly self;
+      }).apps;
 
       devShells = forAllSystems (
         system:
