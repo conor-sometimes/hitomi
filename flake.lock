@@ -36,6 +36,26 @@
         "type": "github"
       }
     },
+    "mayfly": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793840959,
+        "narHash": "sha256-DoscItC73FhPbPNoFMhUejRQ29fWXU9avJBLeLjK3e8=",
+        "owner": "conor-sometimes",
+        "repo": "mayfly",
+        "rev": "55e25316530c362d080d2a95806d0612d1e946ac",
+        "type": "github"
+      },
+      "original": {
+        "owner": "conor-sometimes",
+        "repo": "mayfly",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1793645915,
@@ -56,6 +76,7 @@
       "inputs": {
         "crane": "crane",
         "fenix": "fenix",
+        "mayfly": "mayfly",
         "nixpkgs": "nixpkgs"
       }
     },

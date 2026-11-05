@@ -53,3 +53,24 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
         with:
           manifest-path: fuzz/Cargo.toml
+
+  # A real single-distro accuracy smoke on a KVM-capable hosted runner (via
+  # mayfly): boot Ubuntu, install the shipped musl binary with hitomi's own rules
+  # and EICAR suite, assert 100% TP / 0% FP, tear down. The full 8-distro matrix
+  # runs on a dedicated KVM host via `nix run .#matrix`.
+  distro-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: KVM for the runner user
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            system-features = kvm nixos-test benchmark big-parallel
+      - name: Smoke on Ubuntu 24.04
+        run: nix run .#distro-ubuntu-2404
