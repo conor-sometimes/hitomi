@@ -43,11 +43,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793836162,
-        "narHash": "sha256-IIdxt5lCAEXPvxgmTcrmQp2mPbVuOLsin1AouU5tNCU=",
+        "lastModified": 1793840959,
+        "narHash": "sha256-DoscItC73FhPbPNoFMhUejRQ29fWXU9avJBLeLjK3e8=",
         "owner": "conor-sometimes",
         "repo": "mayfly",
-        "rev": "5d6ec9ee1341803252bed5a1ec1b8afdd7178347",
+        "rev": "55e25316530c362d080d2a95806d0612d1e946ac",
         "type": "github"
       },
       "original": {
