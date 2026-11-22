@@ -20,7 +20,7 @@ serde_json = { version = "=1.0.154", default-features = false, features = ["std"
 # `pulley` routes rule evaluation through the wasmtime interpreter (no JIT, no W^X page), which is
 # what lets the sensor run under MemoryDenyWriteExecute=yes (design 2.2). default features stay on
 # for `default-modules`; `magic-module` is not a default and is never enabled.
-yara-x = { version = "=1.22.1", features = ["pulley"] }
+yara-x = { version = "=1.23.0", features = ["pulley"] }
 sha2 = "=0.11.1"
 anyhow = "=1.0.104"
 # The fanotify daemon's only new dependency: three syscalls and a struct of Linux uapi (design 8.1).
