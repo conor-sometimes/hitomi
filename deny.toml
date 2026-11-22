@@ -20,6 +20,11 @@ ignore = [
     # incident): unmaintained, not vulnerable. It is a serde backend inside yara-x's compiled-rules
     # serialisation, not a path attacker-controlled bytes reach; no migration exists upstream.
     "RUSTSEC-2025-0141",
+    # chrono is no longer maintained: unmaintained, not vulnerable, and no safe upgrade exists. It is
+    # only a build-time dependency: yara-x-proto (yara-x's protobuf code generation, a
+    # [build-dependencies] entry of yara-x) pulls it in, so it runs during the build and is not in the
+    # sensor binary. Added 22 Nov 2026.
+    "RUSTSEC-2026-0543",
 ]
 
 [licenses]
